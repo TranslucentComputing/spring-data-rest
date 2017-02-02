@@ -4,14 +4,14 @@
 
 	<modelVersion>4.0.0</modelVersion>
 
-	<artifactId>spring-data-rest-webmvc</artifactId>
+	<artifactId>tc-spring-data-rest-webmvc</artifactId>
 
 	<name>Spring Data REST - WebMVC</name>
 	<description>Spring Data REST - WebMVC</description>
 
 	<parent>
 		<groupId>org.springframework.data</groupId>
-		<artifactId>spring-data-rest-parent</artifactId>
+		<artifactId>tc-spring-data-rest-parent</artifactId>
 		<version>2.6.0.RELEASE</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>

@@ -4,11 +4,11 @@
 
 	<parent>
 		<groupId>org.springframework.data</groupId>
-		<artifactId>spring-data-rest-parent</artifactId>
+		<artifactId>tc-spring-data-rest-parent</artifactId>
 		<version>2.6.0.RELEASE</version>
 	</parent>
 
-	<artifactId>spring-data-rest-hal-browser</artifactId>
+	<artifactId>tc-spring-data-rest-hal-browser</artifactId>
 
 	<name>Spring Data REST - HAL Browser</name>
 

@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>org.springframework.data</groupId>
-	<artifactId>spring-data-rest-parent</artifactId>
+	<artifactId>tc-spring-data-rest-parent</artifactId>
 	<version>2.6.0.RELEASE</version>
 	<packaging>pom</packaging>
 
@@ -24,9 +24,24 @@
 		<module>spring-data-rest-hal-browser</module>
 	</modules>
 
+
+	<distributionManagement>
+       <repository>
+           <id>nexus</id>
+           <name>Releases</name>
+           <url>https://nexus.tekstack.ca/repository/maven-releases</url>
+       </repository>
+       <snapshotRepository>
+           <id>nexus</id>
+           <name>Snapshot</name>
+           <url>https://nexus.tekstack.ca/repository/maven-snapshots</url>
+       </snapshotRepository>
+   </distributionManagement>
+
+
 	<properties>
 		<project.type>multi</project.type>
-		<dist.id>spring-data-rest</dist.id>
+		<dist.id>tc-spring-data-rest</dist.id>
 
 		<springdata.commons>1.13.0.RELEASE</springdata.commons>
 		<springdata.jpa>1.11.0.RELEASE</springdata.jpa>
@@ -89,11 +104,7 @@
 
 			<build>
 				<plugins>
-					<plugin>
-						<groupId>org.jfrog.buildinfo</groupId>
-						<artifactId>artifactory-maven-plugin</artifactId>
-						<inherited>false</inherited>
-					</plugin>
+
 				</plugins>
 			</build>
 
