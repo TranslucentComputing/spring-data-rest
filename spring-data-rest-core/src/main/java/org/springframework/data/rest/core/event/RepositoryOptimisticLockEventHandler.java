@@ -4,7 +4,6 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
 import org.springframework.context.ApplicationListener;
-import org.springframework.data.annotation.Version;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -41,21 +40,20 @@ public class RepositoryOptimisticLockEventHandler implements ApplicationListener
             Class clazz = object.getClass();
             Long oldVersion = null;
             Long newVersion;
-            if (clazz.isAnnotationPresent(Version.class)) {
+            if (findVersionField(clazz) != null) {
                 oldVersion = findVersion(object, clazz);
             }
 
             em.flush();
 
-            if (clazz.isAnnotationPresent(Version.class)) {
-                newVersion = findVersion(object,clazz);
+            if (findVersionField(clazz) != null) {
+                newVersion = findVersion(object, clazz);
 
                 //check if the version changed
-                if((oldVersion==null && newVersion != null) ||
-                        (oldVersion!=null && !oldVersion.equals(newVersion))){
+                if ((oldVersion == null && newVersion != null) ||
+                        (oldVersion != null && !oldVersion.equals(newVersion))) {
                     publisher.publishEvent(new AfterSaveEvent(event.getSource()));
-                }
-                else {
+                } else {
                     //publish event after the save signaling that the main entity was not updated
                     publisher.publishEvent(new AfterSaveNoChangeEvent(event.getSource()));
                 }
@@ -67,13 +65,20 @@ public class RepositoryOptimisticLockEventHandler implements ApplicationListener
     }
 
     private Long findVersion(Object object, Class clazz) {
-        Field[] field = FieldUtils.getFieldsWithAnnotation(clazz, Version.class);
-        Field versionField = field[0];
+        Field versionField = findVersionField(clazz);
         try {
             return (Long) FieldUtils.readField(versionField, object, true);
         } catch (IllegalAccessException e) {
             throw new RuntimeException("Version field not accessible");
         }
+    }
+
+    private Field findVersionField(Class clazz) {
+        Field[] fields = FieldUtils.getFieldsWithAnnotation(clazz, org.springframework.data.annotation.Version.class);
+        if (fields == null) {
+            fields = FieldUtils.getFieldsWithAnnotation(clazz, javax.persistence.Version.class);
+        }
+        return fields == null || fields.length == 0 ? null : fields[0];
     }
 
     @Override

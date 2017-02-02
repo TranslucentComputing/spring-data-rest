@@ -20,9 +20,11 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.Map.Entry;
 
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.springframework.beans.PropertyAccessor;
 import org.springframework.beans.PropertyAccessorFactory;
 import org.springframework.core.CollectionFactory;
@@ -549,7 +551,6 @@ public class DomainObjectReader {
      * Returns the given source instance as {@link Collection} or creates a new one for the given type.
      *
      * @param source can be {@literal null}.
-     * @param type   must not be {@literal null} in case {@code source} is null.
      * @return
      */
     @SuppressWarnings("unchecked")
@@ -709,13 +710,44 @@ public class DomainObjectReader {
                 if (bidirectional) {
                     result = mergeForPutNoAssociations(sourceValue, targetValue, mapper);
                 } else {
-                    result = mergeForPut(sourceValue, targetValue, mapper, false);
+                    if (sourceValue != null && findIdField(sourceValue.getClass()) != null) {
+                        Object sourceId = getId(sourceValue);
+                        Object targetId = getId(targetValue);
+
+                        if (sourceId != null && targetId != null && !sourceId.equals(targetId)) {
+                            result = sourceValue; //do not merge if the entity is different, preserve the new associations
+                        } else {
+                            result = mergeForPut(sourceValue, targetValue, mapper, false);
+                        }
+                    } else {
+                        result = mergeForPut(sourceValue, targetValue, mapper, false);
+                    }
                 }
             } else {
                 result = sourceValue;
             }
 
             targetAccessor.setProperty(property, result);
+        }
+
+        private Object getId(Object object) {
+            if(object == null) return  null;
+
+            Field idField = findIdField(object.getClass());
+            try {
+                return FieldUtils.readField(idField, object, true);
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException("Field to read ID field");
+            }
+        }
+
+        private Field findIdField(Class clazz) {
+            Field[] fields = FieldUtils.getFieldsWithAnnotation(clazz, javax.persistence.Id.class);
+            if (fields == null) {
+                fields = FieldUtils.getFieldsWithAnnotation(clazz, org.springframework.data.annotation.Id.class);
+            }
+
+            return fields == null || fields.length == 0 ? null : fields[0];
         }
     }
 }
