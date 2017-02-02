@@ -86,7 +86,6 @@ public class RepositoryCorsConfigurationAccessorUnitTests {
 		assertThat(configuration.getMaxAge(), is(1234L));
 	}
 
-
 	@Test // DATAREST-994
 	public void returnsNullCorsConfigurationWithNullRepositories() {
 
