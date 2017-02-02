@@ -26,28 +26,34 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 
 /**
  * {@link HandlerMethodArgumentResolver} to resolve If-Match headers for optimistic locking handling {@link IfMatch}.
- * 
+ *
  * @author Pablo Lozano
  * @author Oliver Gierke
  */
 public class ETagArgumentResolver implements HandlerMethodArgumentResolver {
 
-	/* 
-	 * (non-Javadoc)
-	 * @see org.springframework.web.method.support.HandlerMethodArgumentResolver#supportsParameter(org.springframework.core.MethodParameter)
-	 */
-	@Override
-	public boolean supportsParameter(MethodParameter parameter) {
-		return parameter.getParameterType().equals(ETag.class);
-	}
+    /*
+     * (non-Javadoc)
+     * @see org.springframework.web.method.support.HandlerMethodArgumentResolver#supportsParameter(org.springframework.core.MethodParameter)
+     */
+    @Override
+    public boolean supportsParameter(MethodParameter parameter) {
+        return parameter.getParameterType().equals(ETag.class);
+    }
 
-	/* 
-	 * (non-Javadoc)
-	 * @see org.springframework.web.method.support.HandlerMethodArgumentResolver#resolveArgument(org.springframework.core.MethodParameter, org.springframework.web.method.support.ModelAndViewContainer, org.springframework.web.context.request.NativeWebRequest, org.springframework.web.bind.support.WebDataBinderFactory)
-	 */
-	@Override
-	public ETag resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
-			NativeWebRequest webRequest, WebDataBinderFactory binderFactory) throws Exception {
-		return ETag.from(webRequest.getHeader(IF_MATCH));
-	}
+    /*
+     * (non-Javadoc)
+     * @see org.springframework.web.method.support.HandlerMethodArgumentResolver#resolveArgument(org.springframework.core.MethodParameter, org.springframework.web.method.support.ModelAndViewContainer, org.springframework.web.context.request.NativeWebRequest, org.springframework.web.bind.support.WebDataBinderFactory)
+     */
+    @Override
+    public ETag resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
+                                NativeWebRequest webRequest, WebDataBinderFactory binderFactory) throws Exception {
+
+        String tag = webRequest.getHeader(IF_MATCH);
+        if (tag != null && tag.toUpperCase().contains("W/")) { //check for WEAK ETag
+            tag = tag.substring(2);
+        }
+
+        return ETag.from(tag);
+    }
 }
