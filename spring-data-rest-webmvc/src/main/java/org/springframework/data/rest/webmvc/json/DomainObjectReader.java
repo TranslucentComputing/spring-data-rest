@@ -439,14 +439,14 @@ public class DomainObjectReader {
      * @param property Property to check
      * @return True if mappedBy is set on the associations
      */
-    private boolean isBidirectionalAssociation(PersistentProperty<?> property) {
+    private boolean isBidirectionalCollectionAssociation(PersistentProperty<?> property) {
         OneToMany oneToMany = property.findAnnotation(OneToMany.class);
         if (oneToMany != null) {
-            return oneToMany.mappedBy() != null;
+            return oneToMany.mappedBy() != null && oneToMany.mappedBy().length() > 0;
         }
 
         ManyToMany manyToMany = property.findAnnotation(ManyToMany.class);
-        return manyToMany != null && manyToMany.mappedBy() != null;
+        return manyToMany != null && manyToMany.mappedBy() != null && manyToMany.mappedBy().length() > 0;
     }
 
     @SuppressWarnings("unchecked")
@@ -464,7 +464,7 @@ public class DomainObjectReader {
                 : CollectionFactory.createApproximateMap(targetMap, sourceMap.size());
 
         //check if bidirectional mapping
-        boolean bidirectional = isBidirectionalAssociation(property);
+        boolean bidirectional = isBidirectionalCollectionAssociation(property);
 
         for (Entry<Object, Object> entry : sourceMap.entrySet()) {
 
@@ -507,7 +507,7 @@ public class DomainObjectReader {
                 : targetCollection.iterator();
 
         //check if bidirectional mapping
-        boolean bidirectional = isBidirectionalAssociation(property);
+        boolean bidirectional = isBidirectionalCollectionAssociation(property);
 
         while (sourceIterator.hasNext()) {
 
@@ -655,19 +655,19 @@ public class DomainObjectReader {
         private final PersistentPropertyAccessor targetAccessor;
         private final PersistentPropertyAccessor sourceAccessor;
         private final ObjectMapper mapper;
-        private final boolean bidirectional;
+        private final boolean bidirectionalCollection;
 
         /**
          * Creates a new {@link MergingPropertyHandler} for the given source, target, {@link PersistentEntity} and
          * {@link ObjectMapper}.
          *
-         * @param source        must not be {@literal null}.
-         * @param target        must not be {@literal null}.
-         * @param entity        must not be {@literal null}.
-         * @param mapper        must not be {@literal null}.
-         * @param bidirectional
+         * @param source                  must not be {@literal null}.
+         * @param target                  must not be {@literal null}.
+         * @param entity                  must not be {@literal null}.
+         * @param mapper                  must not be {@literal null}.
+         * @param bidirectionalCollection must not be {@literal null}.
          */
-        public MergingPropertyHandler(Object source, Object target, PersistentEntity<?, ?> entity, ObjectMapper mapper, boolean bidirectional) {
+        public MergingPropertyHandler(Object source, Object target, PersistentEntity<?, ?> entity, ObjectMapper mapper, boolean bidirectionalCollection) {
 
             Assert.notNull(source, "Source instance must not be null!");
             Assert.notNull(target, "Target instance must not be null!");
@@ -679,7 +679,7 @@ public class DomainObjectReader {
                     new DefaultConversionService());
             this.sourceAccessor = entity.getPropertyAccessor(source);
             this.mapper = mapper;
-            this.bidirectional = bidirectional;
+            this.bidirectionalCollection = bidirectionalCollection;
         }
 
         /*
@@ -707,12 +707,14 @@ public class DomainObjectReader {
             } else if (property.isCollectionLike()) {
                 result = mergeCollections(property, sourceValue, targetValue, mapper);
             } else if (property.isEntity()) {
-                if (bidirectional) {
+                if (bidirectionalCollection) { //break the recursive cycle, merge only properties and skip associations
                     result = mergeForPutNoAssociations(sourceValue, targetValue, mapper);
                 } else {
                     if (sourceValue != null && findIdField(sourceValue.getClass()) != null) {
                         Object sourceId = getId(sourceValue);
                         Object targetId = getId(targetValue);
+
+                        adjustBidirectionalMapping(property,sourceValue);
 
                         if (sourceId != null && targetId != null && !sourceId.equals(targetId)) {
                             result = sourceValue; //do not merge if the entity is different, preserve the new associations
@@ -730,8 +732,20 @@ public class DomainObjectReader {
             targetAccessor.setProperty(property, result);
         }
 
+        private void adjustBidirectionalMapping(PersistentProperty<?> property,Object sourceValue) {
+            OneToOne oneToOne = property.findAnnotation(OneToOne.class);
+            if (oneToOne != null && oneToOne.mappedBy() != null && oneToOne.mappedBy().length() > 0) {
+                Field field = FieldUtils.getDeclaredField(sourceValue.getClass(), oneToOne.mappedBy(), true);
+                try {
+                    FieldUtils.writeField(field, sourceValue, targetAccessor.getBean(), true);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException("Field to write mappedBy field");
+                }
+            }
+        }
+
         private Object getId(Object object) {
-            if(object == null) return  null;
+            if (object == null) return null;
 
             Field idField = findIdField(object.getClass());
             try {
