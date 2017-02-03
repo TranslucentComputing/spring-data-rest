@@ -716,9 +716,10 @@ public class DomainObjectReader {
 
                         adjustBidirectionalMapping(property,sourceValue);
 
-                        if (sourceId != null && targetId != null && !sourceId.equals(targetId)) {
-                            result = sourceValue; //do not merge if the entity is different, preserve the new associations
-                        } else {
+                        if (sourceId != null && targetId != null) {
+                            result = sourceValue;
+                        }
+                        else {
                             result = mergeForPut(sourceValue, targetValue, mapper, false);
                         }
                     } else {
