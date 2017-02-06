@@ -117,7 +117,7 @@ public class DomainObjectReader {
         try {
 
             Object intermediate = mapper.readerFor(target.getClass()).readValue(source);
-            return (T) mergeForPut(intermediate, target, mapper, false);
+            return (T) mergeForPut(intermediate, target, mapper, false, null);
 
         } catch (Exception o_O) {
             throw new HttpMessageNotReadableException("Could not read payload!", o_O);
@@ -131,9 +131,10 @@ public class DomainObjectReader {
      * @param target        can be {@literal null}.
      * @param mapper        must not be {@literal null}.
      * @param bidirectional
+     * @param parentSource
      * @return
      */
-    <T> T mergeForPut(T source, T target, final ObjectMapper mapper, boolean bidirectional) {
+    <T> T mergeForPut(T source, T target, final ObjectMapper mapper, boolean bidirectional, Object parentSource) {
 
         Assert.notNull(mapper, "ObjectMapper must not be null!");
 
@@ -151,7 +152,7 @@ public class DomainObjectReader {
 
         Assert.notNull(entity, "No PersistentEntity found for ".concat(type.getName()).concat("!"));
 
-        MergingPropertyHandler propertyHandler = new MergingPropertyHandler(source, target, entity, mapper, bidirectional);
+        MergingPropertyHandler propertyHandler = new MergingPropertyHandler(source, target, entity, mapper, bidirectional, parentSource);
 
         entity.doWithProperties(propertyHandler);
         entity.doWithAssociations(new LinkedAssociationAssociationHandler(associationLinks, propertyHandler));
@@ -180,7 +181,7 @@ public class DomainObjectReader {
 
         Assert.notNull(entity, "No PersistentEntity found for ".concat(type.getName()).concat("!"));
 
-        MergingPropertyHandler propertyHandler = new MergingPropertyHandler(source, target, entity, mapper, false);
+        MergingPropertyHandler propertyHandler = new MergingPropertyHandler(source, target, entity, mapper, false, null);
 
         entity.doWithProperties(propertyHandler);
 
@@ -449,6 +450,26 @@ public class DomainObjectReader {
         return manyToMany != null && manyToMany.mappedBy() != null && manyToMany.mappedBy().length() > 0;
     }
 
+    private Object getId(Object object) {
+        if (object == null) return null;
+
+        Field idField = findIdField(object.getClass());
+        try {
+            return FieldUtils.readField(idField, object, true);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Field to read ID field");
+        }
+    }
+
+    private Field findIdField(Class clazz) {
+        Field[] fields = FieldUtils.getFieldsWithAnnotation(clazz, javax.persistence.Id.class);
+        if (fields == null) {
+            fields = FieldUtils.getFieldsWithAnnotation(clazz, org.springframework.data.annotation.Id.class);
+        }
+
+        return fields == null || fields.length == 0 ? null : fields[0];
+    }
+
     @SuppressWarnings("unchecked")
     private Map<Object, Object> mergeMaps(PersistentProperty<?> property, Object source, Object target,
                                           ObjectMapper mapper) {
@@ -469,7 +490,7 @@ public class DomainObjectReader {
         for (Entry<Object, Object> entry : sourceMap.entrySet()) {
 
             Object targetValue = targetMap == null ? null : targetMap.get(entry.getKey());
-            result.put(entry.getKey(), mergeForPut(entry.getValue(), targetValue, mapper, bidirectional));
+            result.put(entry.getKey(), mergeForPut(entry.getValue(), targetValue, mapper, bidirectional, null));
         }
 
         if (targetMap == null) {
@@ -489,7 +510,7 @@ public class DomainObjectReader {
     }
 
     private Collection<Object> mergeCollections(PersistentProperty<?> property, Object source, Object target,
-                                                ObjectMapper mapper) {
+                                                ObjectMapper mapper, Object parentSource) {
 
         Collection<Object> sourceCollection = asCollection(source);
 
@@ -514,7 +535,18 @@ public class DomainObjectReader {
             Object sourceElement = sourceIterator.next();
             Object targetElement = targetIterator.hasNext() ? targetIterator.next() : null;
 
-            result.add(mergeForPut(sourceElement, targetElement, mapper, bidirectional));
+            if (!bidirectional && sourceElement != null && targetElement != null && findIdField(sourceElement.getClass()) != null) {
+                Object sourceId = getId(sourceElement);
+                Object targetId = getId(targetElement);
+
+                if (sourceId != null && targetId != null) {
+                    result.add(sourceElement);
+                } else {
+                    result.add(mergeForPut(sourceElement, targetElement, mapper, false, parentSource));
+                }
+            } else {
+                result.add(mergeForPut(sourceElement, targetElement, mapper, bidirectional, parentSource));
+            }
         }
 
         if (targetCollection == null) {
@@ -656,6 +688,7 @@ public class DomainObjectReader {
         private final PersistentPropertyAccessor sourceAccessor;
         private final ObjectMapper mapper;
         private final boolean bidirectionalCollection;
+        private Object parentSource;
 
         /**
          * Creates a new {@link MergingPropertyHandler} for the given source, target, {@link PersistentEntity} and
@@ -666,8 +699,9 @@ public class DomainObjectReader {
          * @param entity                  must not be {@literal null}.
          * @param mapper                  must not be {@literal null}.
          * @param bidirectionalCollection must not be {@literal null}.
+         * @param parentSource            Object containing the source object
          */
-        public MergingPropertyHandler(Object source, Object target, PersistentEntity<?, ?> entity, ObjectMapper mapper, boolean bidirectionalCollection) {
+        public MergingPropertyHandler(Object source, Object target, PersistentEntity<?, ?> entity, ObjectMapper mapper, boolean bidirectionalCollection, Object parentSource) {
 
             Assert.notNull(source, "Source instance must not be null!");
             Assert.notNull(target, "Target instance must not be null!");
@@ -680,6 +714,7 @@ public class DomainObjectReader {
             this.sourceAccessor = entity.getPropertyAccessor(source);
             this.mapper = mapper;
             this.bidirectionalCollection = bidirectionalCollection;
+            this.parentSource = parentSource;
         }
 
         /*
@@ -705,7 +740,7 @@ public class DomainObjectReader {
             if (property.isMap()) {
                 result = mergeMaps(property, sourceValue, targetValue, mapper);
             } else if (property.isCollectionLike()) {
-                result = mergeCollections(property, sourceValue, targetValue, mapper);
+                result = mergeCollections(property, sourceValue, targetValue, mapper, sourceAccessor.getBean());
             } else if (property.isEntity()) {
                 if (bidirectionalCollection) { //break the recursive cycle, merge only properties and skip associations
                     result = mergeForPutNoAssociations(sourceValue, targetValue, mapper);
@@ -714,16 +749,15 @@ public class DomainObjectReader {
                         Object sourceId = getId(sourceValue);
                         Object targetId = getId(targetValue);
 
-                        adjustBidirectionalMapping(property,sourceValue);
+                        adjustBidirectionalMapping(property, sourceValue);
 
                         if (sourceId != null && targetId != null) {
                             result = sourceValue;
-                        }
-                        else {
-                            result = mergeForPut(sourceValue, targetValue, mapper, false);
+                        } else {
+                            result = mergeForPut(sourceValue, targetValue, mapper, false, null);
                         }
                     } else {
-                        result = mergeForPut(sourceValue, targetValue, mapper, false);
+                        result = mergeForPut(sourceValue, targetValue, mapper, false, null);
                     }
                 }
             } else {
@@ -733,36 +767,20 @@ public class DomainObjectReader {
             targetAccessor.setProperty(property, result);
         }
 
-        private void adjustBidirectionalMapping(PersistentProperty<?> property,Object sourceValue) {
+        private void adjustBidirectionalMapping(PersistentProperty<?> property, Object sourceValue) {
             OneToOne oneToOne = property.findAnnotation(OneToOne.class);
             if (oneToOne != null && oneToOne.mappedBy() != null && oneToOne.mappedBy().length() > 0) {
-                Field field = FieldUtils.getDeclaredField(sourceValue.getClass(), oneToOne.mappedBy(), true);
-                try {
-                    FieldUtils.writeField(field, sourceValue, targetAccessor.getBean(), true);
-                } catch (IllegalAccessException e) {
-                    throw new RuntimeException("Field to write mappedBy field");
-                }
+                writeField(sourceValue, oneToOne.mappedBy());
             }
         }
 
-        private Object getId(Object object) {
-            if (object == null) return null;
-
-            Field idField = findIdField(object.getClass());
+        private void writeField(Object sourceValue, String fieldName) {
+            Field field = FieldUtils.getField(sourceValue.getClass(), fieldName, true);
             try {
-                return FieldUtils.readField(idField, object, true);
+                FieldUtils.writeField(field, sourceValue, targetAccessor.getBean(), true);
             } catch (IllegalAccessException e) {
-                throw new RuntimeException("Field to read ID field");
+                throw new RuntimeException("Field to write mappedBy field");
             }
-        }
-
-        private Field findIdField(Class clazz) {
-            Field[] fields = FieldUtils.getFieldsWithAnnotation(clazz, javax.persistence.Id.class);
-            if (fields == null) {
-                fields = FieldUtils.getFieldsWithAnnotation(clazz, org.springframework.data.annotation.Id.class);
-            }
-
-            return fields == null || fields.length == 0 ? null : fields[0];
         }
     }
 }

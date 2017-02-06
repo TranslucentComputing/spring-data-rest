@@ -476,7 +476,7 @@ public class DomainObjectReaderUnitTests {
 		SampleWithReference source = new SampleWithReference(Arrays.asList(new Nested(1, 2), new Nested(2, 3)));
 		SampleWithReference target = new SampleWithReference(originalCollection);
 
-		SampleWithReference result = reader.mergeForPut(source, target, new ObjectMapper(), false);
+		SampleWithReference result = reader.mergeForPut(source, target, new ObjectMapper(), false, null);
 
 		assertThat(result.nested, is(source.nested));
 		assertThat(result.nested == originalCollection, is(false));
@@ -490,7 +490,7 @@ public class DomainObjectReaderUnitTests {
 				new ArrayList<Nested>(Arrays.asList(new Nested(1, 2), new Nested(2, 3))));
 		SampleWithReference target = new SampleWithReference(originalCollection);
 
-		SampleWithReference result = reader.mergeForPut(source, target, new ObjectMapper(), false);
+		SampleWithReference result = reader.mergeForPut(source, target, new ObjectMapper(), false, null);
 
 		assertThat(result.nested, is(source.nested));
 		assertThat(result.nested == originalCollection, is(true));
