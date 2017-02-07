@@ -58,6 +58,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -443,7 +444,7 @@ class RepositoryEntityController extends AbstractRepositoryRestController implem
      * @param entity
      * @param domainObj
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     private void deleteItem(RepositoryInvoker invoker, PersistentEntity<?, ?> entity, Object domainObj) {
         publisher.publishEvent(new BeforeDeleteEvent(domainObj));
         invoker.invokeDelete((Serializable) entity.getIdentifierAccessor(domainObj).getIdentifier());
@@ -458,7 +459,7 @@ class RepositoryEntityController extends AbstractRepositoryRestController implem
      * @param httpMethod
      * @return
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     private ResponseEntity<ResourceSupport> saveAndReturn(Object domainObject, RepositoryInvoker invoker,
                                                           HttpMethod httpMethod, PersistentEntityResourceAssembler assembler, boolean returnBody) {
 
@@ -487,7 +488,7 @@ class RepositoryEntityController extends AbstractRepositoryRestController implem
      * @param invoker
      * @return
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     private ResponseEntity<ResourceSupport> createAndReturn(Object domainObject, RepositoryInvoker invoker,
                                                             PersistentEntityResourceAssembler assembler, boolean returnBody) {
 
