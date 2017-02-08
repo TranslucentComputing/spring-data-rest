@@ -73,7 +73,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * @author Jeremy Rickard
  */
 @RepositoryRestController
-class RepositoryEntityController extends AbstractRepositoryRestController implements ApplicationEventPublisherAware {
+public class RepositoryEntityController extends AbstractRepositoryRestController implements ApplicationEventPublisherAware {
 
     private static final String BASE_MAPPING = "/{repository}";
     private static final List<String> ACCEPT_PATCH_HEADERS = Arrays.asList(//
@@ -258,6 +258,7 @@ class RepositoryEntityController extends AbstractRepositoryRestController implem
      * @throws HttpRequestMethodNotSupportedException
      */
     @ResponseBody
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @RequestMapping(value = BASE_MAPPING, method = RequestMethod.POST)
     public ResponseEntity<ResourceSupport> postCollectionResource(RootResourceInformation resourceInformation,
                                                                   PersistentEntityResource payload, PersistentEntityResourceAssembler assembler,
@@ -358,6 +359,7 @@ class RepositoryEntityController extends AbstractRepositoryRestController implem
      * @return
      * @throws HttpRequestMethodNotSupportedException
      */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @RequestMapping(value = BASE_MAPPING + "/{id}", method = RequestMethod.PUT)
     public ResponseEntity<? extends ResourceSupport> putItemResource(RootResourceInformation resourceInformation,
                                                                      PersistentEntityResource payload, @BackendId Serializable id, PersistentEntityResourceAssembler assembler,
@@ -415,6 +417,7 @@ class RepositoryEntityController extends AbstractRepositoryRestController implem
      * @throws HttpRequestMethodNotSupportedException
      * @throws ETagDoesntMatchException
      */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @RequestMapping(value = BASE_MAPPING + "/{id}", method = RequestMethod.DELETE)
     public ResponseEntity<?> deleteItemResource(RootResourceInformation resourceInformation, @BackendId Serializable id,
                                                 ETag eTag) throws ResourceNotFoundException, HttpRequestMethodNotSupportedException {
@@ -444,7 +447,6 @@ class RepositoryEntityController extends AbstractRepositoryRestController implem
      * @param entity
      * @param domainObj
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     private void deleteItem(RepositoryInvoker invoker, PersistentEntity<?, ?> entity, Object domainObj) {
         publisher.publishEvent(new BeforeDeleteEvent(domainObj));
         invoker.invokeDelete((Serializable) entity.getIdentifierAccessor(domainObj).getIdentifier());
@@ -459,7 +461,6 @@ class RepositoryEntityController extends AbstractRepositoryRestController implem
      * @param httpMethod
      * @return
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     private ResponseEntity<ResourceSupport> saveAndReturn(Object domainObject, RepositoryInvoker invoker,
                                                           HttpMethod httpMethod, PersistentEntityResourceAssembler assembler, boolean returnBody) {
 
@@ -488,7 +489,6 @@ class RepositoryEntityController extends AbstractRepositoryRestController implem
      * @param invoker
      * @return
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     private ResponseEntity<ResourceSupport> createAndReturn(Object domainObject, RepositoryInvoker invoker,
                                                             PersistentEntityResourceAssembler assembler, boolean returnBody) {
 

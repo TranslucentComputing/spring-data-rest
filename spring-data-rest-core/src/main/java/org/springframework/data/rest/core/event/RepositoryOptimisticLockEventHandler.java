@@ -75,7 +75,7 @@ public class RepositoryOptimisticLockEventHandler implements ApplicationListener
 
     private Field findVersionField(Class clazz) {
         Field[] fields = FieldUtils.getFieldsWithAnnotation(clazz, org.springframework.data.annotation.Version.class);
-        if (fields == null) {
+        if (fields == null || fields.length == 0) {
             fields = FieldUtils.getFieldsWithAnnotation(clazz, javax.persistence.Version.class);
         }
         return fields == null || fields.length == 0 ? null : fields[0];

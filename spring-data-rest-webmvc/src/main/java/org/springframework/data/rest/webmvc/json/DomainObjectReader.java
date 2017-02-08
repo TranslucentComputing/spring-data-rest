@@ -463,7 +463,7 @@ public class DomainObjectReader {
 
     private Field findIdField(Class clazz) {
         Field[] fields = FieldUtils.getFieldsWithAnnotation(clazz, javax.persistence.Id.class);
-        if (fields == null) {
+        if (fields == null || fields.length == 0) {
             fields = FieldUtils.getFieldsWithAnnotation(clazz, org.springframework.data.annotation.Id.class);
         }
 
