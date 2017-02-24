@@ -18,11 +18,13 @@ package org.springframework.data.rest.webmvc;
 import static org.springframework.http.HttpMethod.*;
 
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
@@ -96,10 +98,10 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
      * {@link RepositoryRestConfiguration}, {@link RepositoryEntityLinks}, {@link PagedResourcesAssembler},
      * {@link ConversionService} and {@link AuditableBeanWrapperFactory}.
      *
-     * @param repositories                must not be {@literal null}.
-     * @param config                      must not be {@literal null}.
-     * @param entityLinks                 must not be {@literal null}.
-     * @param assembler                   must not be {@literal null}.
+     * @param repositories    must not be {@literal null}.
+     * @param config          must not be {@literal null}.
+     * @param entityLinks     must not be {@literal null}.
+     * @param assembler       must not be {@literal null}.
      * @param headersPreparer must not be {@literal null}.
      */
     @Autowired
@@ -364,7 +366,7 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
     public ResponseEntity<? extends ResourceSupport> putItemResource(RootResourceInformation resourceInformation,
                                                                      PersistentEntityResource payload, @BackendId Serializable id, PersistentEntityResourceAssembler assembler,
                                                                      ETag eTag, @RequestHeader(value = ACCEPT_HEADER, required = false) String acceptHeader)
-            throws HttpRequestMethodNotSupportedException {
+            throws HttpRequestMethodNotSupportedException, ClassNotFoundException {
 
         resourceInformation.verifySupportedMethod(HttpMethod.PUT, ResourceType.ITEM);
 
@@ -372,8 +374,46 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
         Object objectToSave = payload.getContent();
         eTag.verify(resourceInformation.getPersistentEntity(), objectToSave);
 
+        //increment version for ES domain objects
+        //Entities that extend AbstractAuditingExternalEntity use external versioning
+        //Entities that extend AbstractAuditingInternalEntity use internal versioning
+        if (Class.forName("com.translucentcomputing.tekstack.core.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(resourceInformation.getDomainType())) {
+            Long version = findVersion(objectToSave);
+            updateVersion(objectToSave, version + 1);
+        }
+
         return payload.isNew() ? createAndReturn(objectToSave, invoker, assembler, config.returnBodyOnCreate(acceptHeader))
                 : saveAndReturn(objectToSave, invoker, PUT, assembler, config.returnBodyOnUpdate(acceptHeader));
+    }
+
+    private Long findVersion(Object object) {
+        Field versionField = findVersionField(object.getClass());
+        try {
+            return (Long) FieldUtils.readField(versionField, object, true);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Version field not accessible");
+        }
+    }
+
+    private void updateVersion(Object object, Long newVersion) {
+        Field versionField = findVersionField(object.getClass());
+        writeField(object, versionField, newVersion);
+    }
+
+    private void writeField(Object object, Field field, Long newVersion) {
+        try {
+            FieldUtils.writeField(field, object, newVersion, true);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Field to write mappedBy field");
+        }
+    }
+
+    private Field findVersionField(Class clazz) {
+        Field[] fields = FieldUtils.getFieldsWithAnnotation(clazz, org.springframework.data.annotation.Version.class);
+        if (fields == null || fields.length == 0) {
+            fields = FieldUtils.getFieldsWithAnnotation(clazz, javax.persistence.Version.class);
+        }
+        return fields == null || fields.length == 0 ? null : fields[0];
     }
 
     /**
@@ -435,7 +475,7 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
 
         eTag.verify(entity, domainObj);
 
-        deleteItem(invoker,entity,domainObj);
+        deleteItem(invoker, entity, domainObj);
 
         return new ResponseEntity<Object>(HttpStatus.NO_CONTENT);
     }

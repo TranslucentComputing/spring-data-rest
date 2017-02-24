@@ -28,11 +28,24 @@ public class RepositoryOptimisticLockEventHandler implements ApplicationListener
         Class<? extends RepositoryEvent> eventType = event.getClass();
 
         if (eventType.equals(OptimisticLockEvent.class)) {
-            processEvent(event);
+            try {
+                //Only entities that use internal versioning will be used in CRUD
+                if (Class.forName("com.translucentcomputing.tekstack.core.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(event.getSource().getClass())) {
+                    processEventES(event);
+                } else {
+                    processEventJPA(event);
+                }
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("TEKStack ES Audit classes not found");
+            }
         }
     }
 
-    private void processEvent(RepositoryEvent event) {
+    private void processEventES(RepositoryEvent event) {
+        publisher.publishEvent(new AfterSaveEvent(event.getSource()));
+    }
+
+    private void processEventJPA(RepositoryEvent event) {
         if (em == null || !TransactionSynchronizationManager.isActualTransactionActive()) {
             publisher.publishEvent(new AfterSaveEvent(event.getSource()));
         } else {
