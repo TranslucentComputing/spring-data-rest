@@ -109,14 +109,14 @@ public class PersistentEntityJackson2Module extends SimpleModule {
      * Creates a new {@link PersistentEntityJackson2Module} using the given {@link ResourceMappings}, {@link Repositories}
      * , {@link RepositoryRestConfiguration}, {@link UriToEntityConverter} and {@link SelfLinkProvider}.
      *
-     * @param associations           must not be {@literal null}.
-     * @param entities               must not be {@literal null}.
-     * @param converter              must not be {@literal null}.
-     * @param collector              must not be {@literal null}.
-     * @param factory                must not be {@literal null}.
+     * @param associations must not be {@literal null}.
+     * @param entities must not be {@literal null}.
+     * @param converter must not be {@literal null}.
+     * @param collector must not be {@literal null}.
+     * @param factory must not be {@literal null}.
      * @param lookupObjectSerializer must not be {@literal null}.
-     * @param invoker                must not be {@literal null}.
-     * @param assembler              must not be {@literal null}.
+     * @param invoker must not be {@literal null}.
+     * @param assembler must not be {@literal null}.
      */
     public PersistentEntityJackson2Module(Associations associations, PersistentEntities entities,
                                           UriToEntityConverter converter, LinkCollector collector, RepositoryInvokerFactory factory,
@@ -229,18 +229,10 @@ public class PersistentEntityJackson2Module extends SimpleModule {
     @RequiredArgsConstructor
     static class AssociationOmittingSerializerModifier extends BeanSerializerModifier {
 
-        private final
-        @NonNull
-        PersistentEntities entities;
-        private final
-        @NonNull
-        Associations associations;
-        private final
-        @NonNull
-        NestedEntitySerializer nestedEntitySerializer;
-        private final
-        @NonNull
-        LookupObjectSerializer lookupObjectSerializer;
+        private final @NonNull PersistentEntities entities;
+        private final @NonNull Associations associations;
+        private final @NonNull NestedEntitySerializer nestedEntitySerializer;
+        private final @NonNull LookupObjectSerializer lookupObjectSerializer;
 
         /*
          * (non-Javadoc)
@@ -310,8 +302,8 @@ public class PersistentEntityJackson2Module extends SimpleModule {
          * Returns the {@link PersistentProperty} for the property with the given final name (the name that it will be
          * rendered under eventually).
          *
-         * @param finalName   the output name the property will be rendered under.
-         * @param entity      the {@link PersistentEntity} to find the property on.
+         * @param finalName the output name the property will be rendered under.
+         * @param entity the {@link PersistentEntity} to find the property on.
          * @param description the Jackson {@link BeanDescription}.
          * @return
          */
@@ -370,17 +362,6 @@ public class PersistentEntityJackson2Module extends SimpleModule {
 
                 provider.defaultSerializeValue(resources, gen);
 
-            } else if (value instanceof Object[]) {
-
-                Object[] source = (Object[]) value;
-                List<Object> resources = new ArrayList<Object>();
-
-                for (Object element : source) {
-                    resources.add(toResource(element));
-                }
-
-                provider.defaultSerializeValue(resources, gen);
-
             } else if (value instanceof Map) {
 
                 Map<?, ?> source = (Map<?, ?>) value;
@@ -427,18 +408,10 @@ public class PersistentEntityJackson2Module extends SimpleModule {
     @RequiredArgsConstructor
     public static class AssociationUriResolvingDeserializerModifier extends BeanDeserializerModifier {
 
-        private final
-        @NonNull
-        PersistentEntities entities;
-        private final
-        @NonNull
-        Associations associationLinks;
-        private final
-        @NonNull
-        UriToEntityConverter converter;
-        private final
-        @NonNull
-        RepositoryInvokerFactory factory;
+        private final @NonNull PersistentEntities entities;
+        private final @NonNull Associations associationLinks;
+        private final @NonNull UriToEntityConverter converter;
+        private final @NonNull RepositoryInvokerFactory factory;
 
         /*
          * (non-Javadoc)
@@ -517,7 +490,7 @@ public class PersistentEntityJackson2Module extends SimpleModule {
          * Creates a new {@link UriStringDeserializer} for the given {@link PersistentProperty} using the given
          * {@link UriToEntityConverter}.
          *
-         * @param property  must not be {@literal null}.
+         * @param property must not be {@literal null}.
          * @param converter must not be {@literal null}.
          */
         public UriStringDeserializer(PersistentProperty<?> property, UriToEntityConverter converter) {
@@ -556,8 +529,8 @@ public class PersistentEntityJackson2Module extends SimpleModule {
          * concrete instance anyway.
          *
          * @see com.fasterxml.jackson.databind.deser.std.StdDeserializer#deserializeWithType(com.fasterxml.jackson.core.JsonParser,
-         * com.fasterxml.jackson.databind.DeserializationContext,
-         * com.fasterxml.jackson.databind.jsontype.TypeDeserializer)
+         *      com.fasterxml.jackson.databind.DeserializationContext,
+         *      com.fasterxml.jackson.databind.jsontype.TypeDeserializer)
          */
         @Override
         public Object deserializeWithType(JsonParser jp, DeserializationContext ctxt, TypeDeserializer typeDeserializer)
@@ -578,9 +551,9 @@ public class PersistentEntityJackson2Module extends SimpleModule {
          * Creates a new {@link ProjectionSerializer} for the given {@link LinkCollector}, {@link ResourceMappings} whether
          * to be in unwrapping mode or not.
          *
-         * @param collector  must not be {@literal null}.
-         * @param mappings   must not be {@literal null}.
-         * @param invoker    must not be {@literal null}.
+         * @param collector must not be {@literal null}.
+         * @param mappings must not be {@literal null}.
+         * @param invoker must not be {@literal null}.
          * @param unwrapping
          */
         private ProjectionSerializer(LinkCollector collector, Associations mappings, ResourceProcessorInvoker invoker,
