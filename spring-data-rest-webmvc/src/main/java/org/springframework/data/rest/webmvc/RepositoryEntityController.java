@@ -377,7 +377,7 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
         //increment version for ES domain objects
         //Entities that extend AbstractAuditingExternalEntity use external versioning
         //Entities that extend AbstractAuditingInternalEntity use internal versioning
-        if (Class.forName("com.translucentcomputing.tekstack.core.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(resourceInformation.getDomainType())) {
+        if (Class.forName("com.translucentcomputing.tekstack.core.commons.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(resourceInformation.getDomainType())) {
             Long version = findVersion(objectToSave);
             updateVersion(objectToSave, version + 1);
         }

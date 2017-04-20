@@ -30,7 +30,7 @@ public class RepositoryOptimisticLockEventHandler implements ApplicationListener
         if (eventType.equals(OptimisticLockEvent.class)) {
             try {
                 //Only entities that use internal versioning will be used in CRUD
-                if (Class.forName("com.translucentcomputing.tekstack.core.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(event.getSource().getClass())) {
+                if (Class.forName("com.translucentcomputing.tekstack.core.commons.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(event.getSource().getClass())) {
                     processEventES(event);
                 } else {
                     processEventJPA(event);
