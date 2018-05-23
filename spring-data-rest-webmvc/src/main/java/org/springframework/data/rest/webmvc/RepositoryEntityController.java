@@ -260,7 +260,6 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
      * @throws HttpRequestMethodNotSupportedException
      */
     @ResponseBody
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @RequestMapping(value = BASE_MAPPING, method = RequestMethod.POST)
     public ResponseEntity<ResourceSupport> postCollectionResource(RootResourceInformation resourceInformation,
                                                                   PersistentEntityResource payload, PersistentEntityResourceAssembler assembler,
@@ -361,7 +360,6 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
      * @return
      * @throws HttpRequestMethodNotSupportedException
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @RequestMapping(value = BASE_MAPPING + "/{id}", method = RequestMethod.PUT)
     public ResponseEntity<? extends ResourceSupport> putItemResource(RootResourceInformation resourceInformation,
                                                                      PersistentEntityResource payload, @BackendId Serializable id, PersistentEntityResourceAssembler assembler,
@@ -377,7 +375,7 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
         //increment version for ES domain objects
         //Entities that extend AbstractAuditingExternalEntity use external versioning
         //Entities that extend AbstractAuditingInternalEntity use internal versioning
-        if (Class.forName("com.translucentcomputing.tekstack.core.commons.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(resourceInformation.getDomainType())) {
+        if (Class.forName("com.translucentcomputing.tekstack.core.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(resourceInformation.getDomainType())) {
             Long version = findVersion(objectToSave);
             updateVersion(objectToSave, version + 1);
         }
@@ -457,7 +455,6 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
      * @throws HttpRequestMethodNotSupportedException
      * @throws ETagDoesntMatchException
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @RequestMapping(value = BASE_MAPPING + "/{id}", method = RequestMethod.DELETE)
     public ResponseEntity<?> deleteItemResource(RootResourceInformation resourceInformation, @BackendId Serializable id,
                                                 ETag eTag) throws ResourceNotFoundException, HttpRequestMethodNotSupportedException {
@@ -475,23 +472,11 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
 
         eTag.verify(entity, domainObj);
 
-        deleteItem(invoker, entity, domainObj);
+        deleteItemWithEvents(invoker, entity, domainObj);
 
         return new ResponseEntity<Object>(HttpStatus.NO_CONTENT);
     }
 
-    /**
-     * Delete entity by ID
-     *
-     * @param invoker
-     * @param entity
-     * @param domainObj
-     */
-    private void deleteItem(RepositoryInvoker invoker, PersistentEntity<?, ?> entity, Object domainObj) {
-        publisher.publishEvent(new BeforeDeleteEvent(domainObj));
-        invoker.invokeDelete((Serializable) entity.getIdentifierAccessor(domainObj).getIdentifier());
-        publisher.publishEvent(new AfterDeleteEvent(domainObj));
-    }
 
     /**
      * Merges the given incoming object into the given domain object.
@@ -504,9 +489,7 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
     private ResponseEntity<ResourceSupport> saveAndReturn(Object domainObject, RepositoryInvoker invoker,
                                                           HttpMethod httpMethod, PersistentEntityResourceAssembler assembler, boolean returnBody) {
 
-        publisher.publishEvent(new BeforeSaveEvent(domainObject));
-        Object obj = invoker.invokeSave(domainObject);
-        publisher.publishEvent(new OptimisticLockEvent(obj));
+        Object obj = saveEntityWithEvents(domainObject, invoker);
 
         PersistentEntityResource resource = assembler.toFullResource(obj);
         HttpHeaders headers = headersPreparer.prepareHeaders(resource);
@@ -529,12 +512,10 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
      * @param invoker
      * @return
      */
-    private ResponseEntity<ResourceSupport> createAndReturn(Object domainObject, RepositoryInvoker invoker,
-                                                            PersistentEntityResourceAssembler assembler, boolean returnBody) {
+    public ResponseEntity<ResourceSupport> createAndReturn(Object domainObject, RepositoryInvoker invoker,
+                                                           PersistentEntityResourceAssembler assembler, boolean returnBody) {
 
-        publisher.publishEvent(new BeforeCreateEvent(domainObject));
-        Object savedObject = invoker.invokeSave(domainObject);
-        publisher.publishEvent(new AfterCreateEvent(savedObject));
+        Object savedObject = createEntityWithEvents(domainObject, invoker);
 
         PersistentEntityResource resource = returnBody ? assembler.toFullResource(savedObject) : null;
 
@@ -542,6 +523,76 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
         addLocationHeader(headers, assembler, savedObject);
 
         return ControllerUtils.toResponseEntity(HttpStatus.CREATED, headers, resource);
+    }
+
+    /**
+     * Save entity and publish events
+     *
+     * @param domainObject
+     * @param invoker
+     * @return
+     */
+    public Object saveEntityWithEvents(Object domainObject, RepositoryInvoker invoker) {
+        publisher.publishEvent(new BeforeSaveEvent(domainObject));
+        Object savedObject = saveEntity(domainObject, invoker);
+        publisher.publishEvent(new OptimisticLockEvent(savedObject));
+
+        return savedObject;
+    }
+
+
+    /**
+     * Create entity and publish events
+     *
+     * @param domainObject
+     * @param invoker
+     * @return
+     */
+    public Object createEntityWithEvents(Object domainObject, RepositoryInvoker invoker) {
+        publisher.publishEvent(new BeforeCreateEvent(domainObject));
+        Object savedObject = saveEntity(domainObject, invoker);
+        publisher.publishEvent(new AfterCreateEvent(savedObject));
+
+        return savedObject;
+    }
+
+    /**
+     * Delete entity by ID and publish before and after events
+     *
+     * @param invoker
+     * @param entity
+     * @param domainObj
+     */
+    public void deleteItemWithEvents(RepositoryInvoker invoker, PersistentEntity<?, ?> entity, Object domainObj) {
+        publisher.publishEvent(new BeforeDeleteEvent(domainObj));
+        deleteItem(invoker, entity, domainObj);
+        publisher.publishEvent(new AfterDeleteEvent(domainObj));
+    }
+
+
+    /**
+     * Delete an item with in a transaction by ID
+     *
+     * @param invoker
+     * @param entity
+     * @param domainObj
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void deleteItem(RepositoryInvoker invoker, PersistentEntity<?, ?> entity, Object domainObj) {
+        invoker.invokeDelete((Serializable) entity.getIdentifierAccessor(domainObj).getIdentifier());
+    }
+
+
+    /**
+     * Save entity with in a transaction
+     *
+     * @param domainObject
+     * @param invoker
+     * @return
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Object saveEntity(Object domainObject, RepositoryInvoker invoker) {
+        return invoker.invokeSave(domainObject);
     }
 
     /**
