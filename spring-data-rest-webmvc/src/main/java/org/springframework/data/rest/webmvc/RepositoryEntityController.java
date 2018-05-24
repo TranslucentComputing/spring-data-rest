@@ -375,7 +375,7 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
         //increment version for ES domain objects
         //Entities that extend AbstractAuditingExternalEntity use external versioning
         //Entities that extend AbstractAuditingInternalEntity use internal versioning
-        if (Class.forName("com.translucentcomputing.tekstack.core.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(resourceInformation.getDomainType())) {
+        if (checkIfESEntity(resourceInformation.getDomainType().getClass())) {
             Long version = findVersion(objectToSave);
             updateVersion(objectToSave, version + 1);
         }
@@ -533,13 +533,63 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
      * @return
      */
     public Object saveEntityWithEvents(Object domainObject, RepositoryInvoker invoker) {
+
+        Long previousVersion = null;
+        Long currentVersion = null;
+
+        //cache the previous version
+        if (!checkIfESEntity(domainObject.getClass()) && findVersionField(domainObject.getClass()) != null) {
+            previousVersion = findVersion(domainObject);
+        }
+
+        //publish before event
         publisher.publishEvent(new BeforeSaveEvent(domainObject));
+
+        //update the e
         Object savedObject = saveEntity(domainObject, invoker);
-        publisher.publishEvent(new OptimisticLockEvent(savedObject));
+
+        if (checkIfESEntity(savedObject.getClass())) {   //for ES
+            publisher.publishEvent(new AfterSaveEvent(savedObject));
+        } else { // For JPA
+            if (previousVersion != null) { // only apply if we have the previous version
+                currentVersion = findVersion(savedObject);
+
+                //check if the version changed
+                if ((currentVersion != null && !previousVersion.equals(currentVersion))) {
+                    publisher.publishEvent(new AfterSaveEvent(savedObject));
+                } else {
+                    publisher.publishEvent(new AfterSaveNoChangeEvent(savedObject));
+                }
+            } else {
+                publisher.publishEvent(new AfterSaveEvent(savedObject));
+            }
+        }
 
         return savedObject;
     }
 
+    /**
+     * Check if the entity is of type used by ES.
+     *
+     * @param entityClass Class of the entity
+     *
+     * @return True if it is ES entity
+     */
+    private boolean checkIfESEntity(Class entityClass) {
+        boolean isEntity;
+        try {
+            isEntity = Class.forName("com.translucentcomputing.tekstack.core.commons.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(entityClass);
+        } catch (ClassNotFoundException e) {
+            try { //fallback for older libs
+                isEntity = Class.forName("com.translucentcomputing.tekstack.core.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(entityClass);
+            } catch (ClassNotFoundException e1) {
+                throw new RuntimeException("TEKStack ES Audit classes not found");
+            }
+
+        }
+
+        return isEntity;
+    }
 
     /**
      * Create entity and publish events
