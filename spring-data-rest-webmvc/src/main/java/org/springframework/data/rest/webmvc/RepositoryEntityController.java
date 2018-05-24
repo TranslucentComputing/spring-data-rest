@@ -375,6 +375,7 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
         //increment version for ES domain objects
         //Entities that extend AbstractAuditingExternalEntity use external versioning
         //Entities that extend AbstractAuditingInternalEntity use internal versioning
+        //check supports older packages
         if (checkIfESEntity(resourceInformation.getDomainType().getClass())) {
             Long version = findVersion(objectToSave);
             updateVersion(objectToSave, version + 1);
