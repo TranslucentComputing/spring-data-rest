@@ -582,7 +582,7 @@ public class RepositoryEntityController extends AbstractRepositoryRestController
             isEntity = Class.forName("com.translucentcomputing.tekstack.core.commons.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(entityClass);
         } catch (ClassNotFoundException e) {
             try { //fallback for older libs
-                isEntity = Class.forName("com.translucentcomputing.tekstack.core.commons.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(entityClass);
+                isEntity = Class.forName("com.translucentcomputing.tekstack.core.domain.search.audit.AbstractAuditingInternalEntity").isAssignableFrom(entityClass);
             } catch (ClassNotFoundException e1) {
                 throw new RuntimeException("TEKStack ES Audit classes not found");
             }
